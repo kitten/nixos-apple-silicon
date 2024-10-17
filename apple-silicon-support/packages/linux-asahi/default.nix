@@ -114,6 +114,7 @@ let
         rustfmt
         rustc
       ];
+      NIX_CFLAGS_COMPILE = (old.NIX_CFLAGS_COMPILE or "") + " -march=armv8.6-a+fp16+fp16fml+aes+sha2+sha3+bf16+i8mm+nosve+nosve2+nomemtag+nosm4+nof32mm+nof64mm";
       RUST_LIB_SRC = rustPlatform.rustLibSrc;
     } else {});
 
