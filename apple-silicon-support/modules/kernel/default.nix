@@ -18,36 +18,26 @@
 
     boot.initrd.includeDefaultModules = false;
     boot.initrd.availableKernelModules = [
-      # list of initrd modules stolen from
+      # list of initrd modules originally stolen by tpwrules from
       # https://github.com/AsahiLinux/asahi-scripts/blob/f461f080a1d2575ae4b82879b5624360db3cff8c/initcpio/install/asahi
-      "apple-mailbox"
-      "nvme_apple"
-      "pinctrl-apple-gpio"
-      "macsmc"
-      "macsmc-rtkit"
-      "i2c-pasemi-platform"
+      # refined by zzywysm to match his custom kernel configs
       "tps6598x"
-      "apple-dart"
       "dwc3"
+      "dwc3-haps"
       "dwc3-of-simple"
       "xhci-pci"
-      "pcie-apple"
-      "gpio_macsmc"
       "phy-apple-atc"
-      "nvmem_apple_efuses"
-      "spi-apple"
-      "spi-hid-apple"
-      "spi-hid-apple-of"
-      "rtc-macsmc"
-      "simple-mfd-spmi"
-      "spmi-apple-controller"
-      "nvmem_spmi_mfd"
-      "apple-dockchannel"
+      "phy-apple-dptx"
       "dockchannel-hid"
-      "apple-rtkit-helper"
+      "mux-apple-display-crossbar"
+      "apple-dcp"
+      "apple-z2"
 
       # additional stuff necessary to boot off USB for the installer
       # and if the initrd (i.e. stage 1) goes wrong
+      "uas"
+      "udc_core"
+      "xhci-hcd"
       "usb-storage"
       "xhci-plat-hcd"
       "usbhid"
@@ -55,9 +45,23 @@
     ];
 
     boot.kernelParams = [
-      "earlycon"
+      # nice insurance against f***ing up the kernel so much, the Mac no longer boots
+      # (NixOS generations are another wonderful insurance policy, obvs)
       "boot.shell_on_fail"
+      # There was originally a scary warning here from tpwrules based on the commit
+      # https://github.com/AsahiLinux/linux/commit/eecbf0d278c3a5785d460246e9baef22705410f1
+      # warning that if you set flush_interval > 0, there is a theoretical possibility
+      # of data loss for data written in the 1-2 seconds before power loss.  This is
+      # not a worry on laptops because they are battery-backed.  This risk can be mitigated
+      # on the desktop with a UPS.  Setting this to zero decreases disk performance by 95%
+      # so we set it to the recommended 1000 and don't worry too much about data loss
+      "nvme_apple.flush_interval=1000"
+      # make boot mostly silent, not because we don't appreciate the useful
+      # information (we do), but because spew slows down boot
+      "quiet"
+      "loglevel=4"
       "systemd.show_status=auto"
+      "rd.udev.log_level=4"
     ];
 
     # U-Boot does not support EFI variables
@@ -90,7 +94,7 @@
 
   options.hardware.asahi.withRust = lib.mkOption {
     type = lib.types.bool;
-    default = false;
+    default = true;
     description = ''
       Build the Asahi Linux kernel with Rust support.
     '';
