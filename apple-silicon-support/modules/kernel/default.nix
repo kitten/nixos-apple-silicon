@@ -58,6 +58,7 @@
       "earlycon"
       "console=tty0"
       "boot.shell_on_fail"
+      "systemd.show_status=auto"
     ];
 
     # U-Boot does not support EFI variables
