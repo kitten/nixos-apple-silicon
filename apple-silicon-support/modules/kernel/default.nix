@@ -28,28 +28,26 @@
 
     boot.initrd.includeDefaultModules = false;
     boot.initrd.availableKernelModules = [
-      # list of initrd modules originally stolen by tpwrules from
-      # https://github.com/AsahiLinux/asahi-scripts/blob/f461f080a1d2575ae4b82879b5624360db3cff8c/initcpio/install/asahi
-      # refined by zzywysm to match his custom kernel configs
-      "tps6598x"
-      "dwc3"
-      "dwc3-haps"
-      "dwc3-of-simple"
-      "xhci-pci"
-      "phy-apple-atc"
+      # See: https://github.com/AsahiLinux/asahi-scripts/blob/65e153fa77da7a6c6dcabcfe8185c3c25f29ae30/initcpio/install/asahi
+      "apple-mailbox" # For NVMe and SMC
+      "nvme-apple" # For NVMe
+      "pinctrl-apple-gpio" # For USB and HID
+      "macsmc" "macsmc-rtkit" # SMC core
+      "i2c-pasemi-platform" "tps6598x" "apple-dart" "dwc3" "dwc3-of-simple" "dwc3-haps" "nvmem-apple-efuses" "phy-apple-atc" "xhci-plat-hcd" "xhci-pci" "pcie-apple" "gpio_macsmc" # For USB
+      "spi-apple" "spi-hid-apple" "spi-hid-apple-of" # For HID
+      "rtc-macsmc" "simple-mfd-spmi" "spmi-apple-controller" "nvmem_spmi_mfd" # For RTC
+      "apple-dockchannel" "dockchannel-hid" "apple-rtkit-helper" # For MTP HID
+
+      # See: https://github.com/zzywysm/nixos-asahi/blob/6ce92714c9a34a96b13fac54d08b60bac41d65b9/apple-silicon-support/modules/kernel/default.nix#L32
       "phy-apple-dptx"
-      "dockchannel-hid"
       "mux-apple-display-crossbar"
       "apple-dcp"
-      "apple-z2"
 
-      # additional stuff necessary to boot off USB for the installer
-      # and if the initrd (i.e. stage 1) goes wrong
+      # additional stuff necessary to boot off USB for the installer and if the initrd (i.e. stage 1) goes wrong
       "uas"
       "udc_core"
       "xhci-hcd"
       "usb-storage"
-      "xhci-plat-hcd"
       "usbhid"
       "hid_generic"
     ];
