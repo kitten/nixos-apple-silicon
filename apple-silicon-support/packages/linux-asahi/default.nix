@@ -1,124 +1,264 @@
 { lib
-, pkgs
 , callPackage
-, writeShellScriptBin
-, writeText
 , linuxPackagesFor
-, withRust ? true
 , _kernelPatches ? [ ]
 }:
 
 let
-  i = builtins.elemAt;
-
-  # parse <OPT> [ymn]|foo style configuration as found in a patch's extraConfig
-  # into a list of k, v tuples
-  parseExtraConfig = config:
-    let
-      lines =
-        builtins.filter (s: s != "") (lib.strings.splitString "\n" config);
-      parseLine = line: let
-        t = lib.strings.splitString " " line;
-        join = l: builtins.foldl' (a: b: "${a} ${b}")
-          (builtins.head l) (builtins.tail l);
-        v = if (builtins.length t) > 2 then join (builtins.tail t) else (i t 1);
-      in [ "CONFIG_${i t 0}" v ];
-    in map parseLine lines;
-
-  # parse <OPT>=lib.kernel.(yes|module|no)|lib.kernel.freeform "foo"
-  # style configuration as found in a patch's extraStructuredConfig into
-  # a list of k, v tuples
-  parseExtraStructuredConfig = config: lib.attrsets.mapAttrsToList
-    (k: v: [ "CONFIG_${k}" (v.tristate or v.freeform) ] ) config;
-
-  parsePatchConfig = { extraConfig ? "", extraStructuredConfig ? {}, ... }:
-    (parseExtraConfig extraConfig) ++
-    (parseExtraStructuredConfig extraStructuredConfig);
-
-  # parse CONFIG_<OPT>=[ymn]|"foo" style configuration as found in a config file
-  # into a list of k, v tuples
-  parseConfig = config:
-    let
-      parseLine = builtins.match ''(CONFIG_[[:upper:][:digit:]_]+)=(([ymn])|"([^"]*)")'';
-      # get either the [ymn] option or the "foo" option; whichever matched
-      t = l: let v = (i l 2); in [ (i l 0) (if v != null then v else (i l 3)) ];
-      lines = lib.strings.splitString "\n" config;
-    in map t (builtins.filter (l: l != null) (map parseLine lines));
-
-  origConfigfile = ./config;
-
-  linux-asahi-pkg = { stdenv, lib, fetchFromGitHub, fetchpatch, linuxKernel,
-      rustPlatform, rustc, rustfmt, rust-bindgen, ... } @ args:
-    let
-      origConfigText = builtins.readFile origConfigfile;
-
-      # extraConfig from all patches in order
-      extraConfig =
-        lib.fold (patch: ex: ex ++ (parsePatchConfig patch)) [] _kernelPatches;
-      # config file text for above
-      extraConfigText = let
-        text = k: v: if (v == "y") || (v == "m") || (v == "n")
-          then "${k}=${v}" else ''${k}="${v}"'';
-      in (map (t: text (i t 0) (i t 1)) extraConfig);
-
-      # final config as a text file path
-      configfile = if extraConfig == [] then origConfigfile else
-        writeText "config" ''
-          ${origConfigText}
-
-          # Patches
-          ${lib.strings.concatStringsSep "\n" extraConfigText}
-        '';
-      # final config as an attrset
-      configAttrs = let
-        makePair = t: lib.nameValuePair (i t 0) (i t 1);
-        configList = (parseConfig origConfigText) ++ extraConfig;
-      in builtins.listToAttrs (map makePair (lib.lists.reverseList configList));
-
-      # used to (ostensibly) keep compatibility for those running stable versions of nixos
-      rustOlder = version: withRust && (lib.versionOlder rustc.version version);
-      bindgenOlder = version: withRust && (lib.versionOlder rust-bindgen.unwrapped.version version);
-
-      # used to fix issues when nixpkgs gets ahead of the kernel
-      rustAtLeast = version: withRust && (lib.versionAtLeast rustc.version version);
-      bindgenAtLeast = version: withRust && (lib.versionAtLeast rust-bindgen.unwrapped.version version);
-    in
-    (linuxKernel.manualConfig rec {
+  linux-asahi-pkg = { stdenv, lib, fetchFromGitHub, buildLinux, ... } @ args:
+    (buildLinux rec {
       inherit stdenv lib;
 
-      version = "6.12.12-asahi";
-      modDirVersion = version;
-      extraMeta.branch = "6.12";
+      version = "6.13.5-3-asahi";
+      modDirVersion = "6.13.5-asahi";
+      extraMeta.branch = "6.13";
 
       src = fetchFromGitHub {
         # tracking: https://github.com/AsahiLinux/linux/tree/asahi-wip (w/ fedora verification)
         owner = "AsahiLinux";
         repo = "linux";
-        rev = "asahi-6.12.12-1";
-        hash = "sha256-910TiROccEleI/qB34DWh3M3bgP3SSCjEP9z7lD9BjM=";
+        rev = "asahi-6.13.5-3";
+        hash = "sha256-V+jMkrFBTkaqvyihgBry1plgc6AoCicDM149lJu3Z5k=";
       };
 
+      ignoreConfigErrors = true;
+
       kernelPatches = [
-        { name = "coreutils-fix";
+        {
+          name = "coreutils-fix";
           patch = ./0001-fs-fcntl-accept-more-values-as-F_DUPFD_CLOEXEC-args.patch;
         }
-      ] ++ _kernelPatches;
+        {
+          name = "Asahi config";
+          patch = null;
+          extraStructuredConfig = with lib.kernel; {
+            # Enforced Config
+            # See: https://github.com/AsahiLinux/docs/blob/28f210d1e357d649d2e60ab908714ac3cb7da538/docs/Kernel-config-notes-for-distros.md
+            DRM = yes;
+            RUST = yes;
+            GCC_PLUGINS = unset;
+            ARM64_16K_PAGES = yes;
+            RUST_DEBUG_ASSERTIONS = unset;
+            RUST_OVERFLOW_CHECKS = yes;
+            RUST_BUILD_ASSERT_ALLOW = unset;
 
-      inherit configfile;
-      # hide Rust support from the nixpkgs infra to avoid it re-adding the rust packages.
-      # we can't use it until it's in stable and until we've evaluated the cross-compilation impact.
-      config = configAttrs // { "CONFIG_RUST" = "n"; };
-    } // (args.argsOverride or {})).overrideAttrs (old: if withRust then {
-      nativeBuildInputs = (old.nativeBuildInputs or []) ++ [
-        rust-bindgen
-        rustfmt
-        rustc
-      ];
+            UCLAMP_TASK = yes;
+            UCLAMP_TASK_GROUP = yes;
+            SUSPEND = yes;
+            HIBERNATION = unset;
+            CPU_FREQ_DEFAULT_GOV_SCHEDUTIL = yes;
+            CPU_FREQ_DEFAULT_GOV_PERFORMANCE = lib.mkForce unset;
+            ENERGY_MODEL = yes;
+            SERIAL_SAMSUNG = yes;
+            SERIAL_SAMSUNG_CONSOLE = yes;
+            REGULATOR_FIXED_VOLTAGE = yes;
+            WATCHDOG_HANDLE_BOOT_ENABLED = yes;
+            DRM_ASAHI_DEBUG_ALLOCATOR = unset;
+            DRM_FBDEV_EMULATION = yes;
+            DRM_SCHED = yes;
+            DRM_VGEM = no;
+            DRM_GEM_SHMEM_HELPER = yes;
+            SND_SOC_CS42L83 = module;
+            SND_SOC_TAS2764 = module;
+            SND_SOC_TAS2770 = module;
+            HID_BATTERY_STRENGTH = yes;
+            HID_APPLE = module;
+            HID_MAGICMOUSE = module;
+            MOUSE_APPLETOUCH = module;
+            INPUT_LEDS = yes;
+            LEDS_PWM = yes;
+            USB_XHCI_HCD = module;
+            USB_DWC3 = module;
+            USB_DWC3_DUAL_ROLE = yes;
+            TYPEC_TPS6598X = module;
+            MMC_SDHCI = module;
+            MMC_SDHCI_PCI = module;
+            NET_VENDOR_AQUANTIA = yes;
+            AQTION = module;
+            NET_VENDOR_BROADCOM = yes;
+            TIGON3 = module;
+            BT = module;
+            BT_BREDR = yes;
+            BT_RFCOMM = module;
+            BT_BNEP = module;
+            BT_HIDP = module;
+            BT_LE = yes;
+            BT_HCIUART_BCM = yes;
+            CFG80211 = module;
+            WLAN_VENDOR_BROADCOM = yes;
+            BRCMFMAC = module;
+            BRCMFMAC_PROTO_BCDC = yes;
+            BRCMFMAC_PROTO_MSGBUF = yes;
+            BRCMFMAC_USB = yes;
+            BRCMFMAC_PCIE = yes;
+            APPLE_MFI_FASTCHARGE = module;
+
+            # Asahi Config
+            # See: https://github.com/AsahiLinux/docs/blob/28f210d1e357d649d2e60ab908714ac3cb7da538/docs/Kernel-config-notes-for-distros.md
+            ARCH_APPLE = yes;
+            ARM64_MEMORY_MODEL_CONTROL = yes;
+            APPLE_AIC = yes;
+            APPLE_WATCHDOG = yes;
+            APPLE_DART = yes;
+            APPLE_SART = yes;
+            APPLE_PLATFORMS = yes;
+            APPLE_MAILBOX = yes;
+            APPLE_RTKIT = yes;
+            APPLE_RTKIT_HELPER = yes;
+            RUST_APPLE_RTKIT = yes;
+            APPLE_SMC = yes;
+            APPLE_SMC_RTKIT = yes;
+            APPLE_PMGR_PWRSTATE = yes;
+            APPLE_PMGR_MISC = yes;
+            I2C_APPLE = yes;
+            NVME_APPLE = yes;
+            PCIE_APPLE = yes;
+            PINCTRL_APPLE_GPIO = yes;
+            PWM_APPLE = yes;
+            SPI_APPLE = yes;
+            SPMI_APPLE = yes;
+            GPIO_MACSMC = yes;
+            SENSORS_MACSMC = module;
+            ARM_APPLE_SOC_CPUFREQ = yes;
+            APPLE_ADMAC = yes;
+            APPLE_M1_CPU_PMU = yes;
+            COMMON_CLK_APPLE_NCO = yes;
+            ARM_APPLE_CPUIDLE = yes;
+            TOUCHSCREEN_APPLE_Z2 = module;
+            INPUT_MACSMC_HID = yes;
+            POWER_RESET_MACSMC = yes;
+            CHARGER_MACSMC = yes;
+            MFD_APPLE_SPMI_PMU = yes;
+            VIDEO_APPLE_ISP = module;
+            DRM_ASAHI = yes;
+            DRM_ADP = module;
+            DRM_APPLE = module;
+            DRM_APPLE_AUDIO = yes;
+            APPLE_SIO = module;
+            APPLE_SEP = yes;
+            APPLE_AOP = yes;
+            SND_SOC_APPLE_AOP_AUDIO = module;
+            SND_SOC_APPLE_MACAUDIO = module;
+            SND_SOC_APPLE_MCA = module;
+            SND_SOC_CS42L84 = module;
+            SPI_HID_APPLE_OF = yes;
+            HID_DOCKCHANNEL = yes;
+            BT_HCIBCM4377 = module;
+            RTC_DRV_MACSMC = yes;
+            APPLE_DOCKCHANNEL = yes;
+            PHY_APPLE_ATC = module;
+            PHY_APPLE_DPTX = module;
+            NVMEM_SPMI_MFD = yes;
+            MUX_APPLE_DPXBAR = module;
+            NVMEM_APPLE_EFUSES = yes;
+            IIO_AOP_SENSOR_LAS = module;
+            IIO_AOP_SENSOR_ALS = module;
+
+            # Explicit overrides (from Alarm)
+            # See: https://github.com/asahi-alarm/PKGBUILDs/blob/c392eb8337788892ec67ac34b4bc842880d4fecd/linux-asahi/config
+            CPUFREQ_DT = yes;
+            CPUFREQ_DT_PLATDEV = yes;
+            RUST_DRM_SCHED = yes;
+            RUST_DRM_GEM_SHMEM_HELPER = yes;
+            RUST_DRM_GPUVM = yes;
+            DRM_VIRTIO_GPU = module;
+            DRM_VIRTIO_GPU_KMS = yes;
+            DRM_PANEL = yes;
+            DRM_ACCEL = yes;
+
+            # Skip some DRM modules
+            DRM_RADEON = lib.mkForce no;
+            DRM_AMDGPU = lib.mkForce no;
+            DRM_NOUVEAU = lib.mkForce no;
+            DRM_XE = lib.mkForce no;
+            DRM_VKMS = lib.mkForce no;
+            DRM_VMWGFX = lib.mkForce no;
+            DRM_UDL = module;
+            DRM_AST = lib.mkForce no;
+            DRM_MGAG200 = lib.mkForce no;
+            DRM_QXL = lib.mkForce no;
+            # Associated unsets
+            DRM_AMDGPU_CIK = lib.mkForce unset;
+            DRM_AMDGPU_SI = lib.mkForce unset;
+            DRM_AMDGPU_USERPTR = lib.mkForce unset;
+            DRM_AMD_ACP = lib.mkForce unset;
+            DRM_AMD_DC_FP = lib.mkForce unset;
+            DRM_AMD_DC_SI = lib.mkForce unset;
+            DRM_AMD_ISP = lib.mkForce unset;
+            DRM_AMD_SECURE_DISPLAY = lib.mkForce unset;
+            DRM_NOUVEAU_GSP_DEFAULT = lib.mkForce unset;
+            DRM_NOUVEAU_SVM = lib.mkForce unset;
+            HSA_AMD = lib.mkForce unset;
+
+            # Skip some networking modules
+            WLAN_VENDOR_INTEL = lib.mkForce no;
+            WLAN_VENDOR_INTERSIL = lib.mkForce no;
+            WLAN_VENDOR_MARVELL = lib.mkForce no;
+            WCN36XX = lib.mkForce no;
+            ATH11K = lib.mkForce no;
+            ATH12K = lib.mkForce no;
+            ATH5K = lib.mkForce no;
+            ATH5K_PCI = lib.mkForce unset;
+            ATH9K = lib.mkForce no;
+
+            # Skip some Crypto modules
+            OCTEONTX2_AF = lib.mkForce no;
+            OCTEONTX2_PF = lib.mkForce no;
+            CRYPTO_DEV_MARVELL_CESA = lib.mkForce no;
+
+            # Explicitly disable unsupported architectures
+            ARCH_ACTIONS = lib.mkForce no;
+            ARCH_AIROHA = lib.mkForce no;
+            ARCH_SUNXI = lib.mkForce no;
+            ARCH_ALPINE = lib.mkForce no;
+            ARCH_BCM = lib.mkForce no;
+            ARCH_BERLIN = lib.mkForce no;
+            ARCH_BITMAIN = lib.mkForce no;
+            ARCH_EXYNOS = lib.mkForce no;
+            ARCH_SPARX5 = lib.mkForce no;
+            ARCH_K3 = lib.mkForce no;
+            ARCH_LG1K = lib.mkForce no;
+            ARCH_HISI = lib.mkForce no;
+            ARCH_KEEMBAY = lib.mkForce no;
+            ARCH_MEDIATEK = lib.mkForce no;
+            ARCH_MESON = lib.mkForce no;
+            ARCH_MVEBU = lib.mkForce no;
+            ARCH_NXP = lib.mkForce no;
+            ARCH_MA35 = lib.mkForce no;
+            ARCH_NPCM = lib.mkForce no;
+            ARCH_PENSANDO = lib.mkForce no;
+            ARCH_QCOM = lib.mkForce no;
+            ARCH_REALTEK = lib.mkForce no;
+            ARCH_RENESAS = lib.mkForce no;
+            ARCH_ROCKCHIP = lib.mkForce no;
+            ARCH_SEATTLE = lib.mkForce no;
+            ARCH_INTEL_SOCFPGA = lib.mkForce no;
+            ARCH_STM32 = lib.mkForce no;
+            ARCH_SYNQUACER = lib.mkForce no;
+            ARCH_TEGRA = lib.mkForce no;
+            ARCH_SPRD = lib.mkForce no;
+            ARCH_THUNDER = lib.mkForce no;
+            ARCH_THUNDER2 = lib.mkForce no;
+            ARCH_UNIPHIER = lib.mkForce no;
+            ARCH_VEXPRESS = lib.mkForce no;
+            ARCH_VISCONTI = lib.mkForce no;
+            ARCH_XGENE = lib.mkForce no;
+            ARCH_ZYNQMP = lib.mkForce no;
+
+            # Explicit custom overrides
+            NVME_AUTH = lib.mkForce yes;
+            HZ_1000 = yes;
+            CPU_FREQ_GOV_SCHEDUTIL = yes;
+            FUNCTION_ALIGNMENT_4B = yes;
+          };
+          features.rust = true;
+        }
+      ] ++ _kernelPatches;
+    } // (args.argsOverride or {})).overrideAttrs (old: {
       NIX_CFLAGS_COMPILE = (old.NIX_CFLAGS_COMPILE or "") + " -march=armv8.6-a+fp16+fp16fml+aes+sha2+sha3+bf16+i8mm+nosve+nosve2+nomemtag+nosm4+nof32mm+nof64mm";
-      RUST_LIB_SRC = rustPlatform.rustLibSrc;
       hardeningEnable = [ "pic" "format" "fortify" "stackprotector" ];
       hardeningDisable = [ "bindnow" "pie" "relro" ];
-    } else {});
+    });
 
   linux-asahi = (callPackage linux-asahi-pkg { });
 in lib.recurseIntoAttrs (linuxPackagesFor linux-asahi)
