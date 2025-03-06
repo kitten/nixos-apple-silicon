@@ -15,6 +15,17 @@
     # source: https://www.kernel.org/doc/html/latest/scheduler/sched-energy.html
     powerManagement.cpuFreqGovernor = lib.mkOverride 800 "schedutil";
 
+    # using an IO scheduler is pretty pointless on NVME devices as fast as Apple's
+    # it's a waste of CPU cycles, so disable the IO scheduler on NVME
+    # source: https://wiki.ubuntu.com/Kernel/Reference/IOSchedulers
+    services.udev.extraRules = ''
+      ACTION=="add|change", KERNEL=="nvme[0-9]*n[0-9]", ATTR{queue/rotational}=="0", ATTR{queue/scheduler}="none"
+    '';
+    # these two lines save 4 whole seconds during userspace boot, according to systemd-analyze.
+    # if you're using a USB cellular internet modem (e.g. 4G, LTE, 5G, etc), then don't disable ModemManager
+    systemd.services.mount-pstore.enable = lib.mkDefault false;
+    systemd.services.ModemManager.enable = lib.mkDefault false;
+
     boot.initrd.includeDefaultModules = false;
     boot.initrd.availableKernelModules = [
       # list of initrd modules originally stolen by tpwrules from
