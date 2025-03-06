@@ -38,7 +38,7 @@
             };
           in {
             inherit (pkgs) m1n1 uboot-asahi linux-asahi asahi-fwextract mesa-asahi-edge;
-            inherit (pkgs) asahi-audio;
+            inherit (pkgs) asahi-audio alsa-ucm-conf-asahi;
 
             installer-bootstrap =
               let
