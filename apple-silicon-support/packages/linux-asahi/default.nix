@@ -9,7 +9,7 @@ let
     (buildLinux rec {
       inherit stdenv lib;
 
-      version = "6.13.5-3-asahi";
+      version = "6.13.5-4-asahi";
       modDirVersion = "6.13.5-asahi";
       extraMeta.branch = "6.13";
 
@@ -17,8 +17,8 @@ let
         # tracking: https://github.com/AsahiLinux/linux/tree/asahi-wip (w/ fedora verification)
         owner = "AsahiLinux";
         repo = "linux";
-        rev = "asahi-6.13.5-3";
-        hash = "sha256-V+jMkrFBTkaqvyihgBry1plgc6AoCicDM149lJu3Z5k=";
+        rev = "asahi-6.13.5-4";
+        hash = "sha256-/IOYOLLR9XOdCPcYN3txtEzvoY2HZQ7MpgOdNACwfJc=";
       };
 
       ignoreConfigErrors = true;
@@ -32,6 +32,15 @@ let
           name = "Asahi config";
           patch = null;
           extraStructuredConfig = with lib.kernel; {
+            # Slim down common config
+            STAGING = lib.mkForce no;
+            MICROCODE = lib.mkForce no;
+            VIRT_DRIVERS = lib.mkForce no;
+            XEN = lib.mkForce unset;
+            MEDIA_DIGITAL_TV_SUPPORT = lib.mkForce no;
+            MEDIA_ANALOG_TV_SUPPORT = lib.mkForce no;
+            CHROME_PLATFORMS = lib.mkForce no;
+
             # Enforced Config
             # See: https://github.com/AsahiLinux/docs/blob/28f210d1e357d649d2e60ab908714ac3cb7da538/docs/Kernel-config-notes-for-distros.md
             DRM = yes;
@@ -92,6 +101,9 @@ let
             BRCMFMAC_USB = yes;
             BRCMFMAC_PCIE = yes;
             APPLE_MFI_FASTCHARGE = module;
+            SND_SOC = yes;
+            SND_SOC_GENERIC_DMAENGINE_PCM = yes;
+            SND_SOC_COMPRESS = yes;
 
             # Asahi Config
             # See: https://github.com/AsahiLinux/docs/blob/28f210d1e357d649d2e60ab908714ac3cb7da538/docs/Kernel-config-notes-for-distros.md
@@ -166,6 +178,43 @@ let
             DRM_PANEL = yes;
             DRM_ACCEL = yes;
 
+            # Explicit sound overrides
+            SOUND_OSS_CORE = yes;
+            SOUND_OSS_CORE_PRECLAIM = yes;
+            SND_PCM = yes;
+            SND_DMAENGINE_PCM = module;
+            SND_HWDEP = module;
+            SND_SEQ_DEVICE = yes;
+            SND_COMPRESS_OFFLOAD = yes;
+            SND_OSSEMUL = yes;
+            SND_MIXER_OSS = module;
+            SND_PCM_OSS = module;
+            SND_PCM_OSS_PLUGINS = yes;
+            SND_PCM_TIMER = yes;
+            SND_HRTIMER = yes;
+            SND_DYNAMIC_MINORS = yes;
+            SND_PROC_FS = yes;
+            SND_VERBOSE_PROCFS = yes;
+            SND_CTL_FAST_LOOKUP = yes;
+            SND_CTL_INPUT_VALIDATION = yes;
+            SND_UTIMER = yes;
+            SND_VMASTER = yes;
+            SND_SEQUENCER = yes;
+            SND_SEQ_DUMMY = yes;
+            SND_SEQUENCER_OSS = module;
+            SND_SEQ_HRTIMER_DEFAULT = yes;
+            SND_SEQ_MIDI_EVENT = module;
+            SND_SEQ_MIDI = module;
+            SND_SEQ_VIRMIDI = module;
+            SND_MPU401_UART = module;
+            SND_DRIVERS = yes;
+            SND_DUMMY = module;
+            SND_ALOOP = module;
+            SND_VIRMIDI = module;
+            SND_MTPAV = module;
+            SND_SERIAL_U16550 = module;
+            SND_MPU401 = module;
+
             # Skip some DRM modules
             DRM_RADEON = lib.mkForce no;
             DRM_AMDGPU = lib.mkForce no;
@@ -200,11 +249,12 @@ let
             ATH5K = lib.mkForce no;
             ATH5K_PCI = lib.mkForce unset;
             ATH9K = lib.mkForce no;
+            NET_VENDOR_MEDIATEK = lib.mkForce unset;
 
             # Skip some Crypto modules
             OCTEONTX2_AF = lib.mkForce no;
             OCTEONTX2_PF = lib.mkForce no;
-            CRYPTO_DEV_MARVELL_CESA = lib.mkForce no;
+            CRYPTO_DEV_MARVELL_CESA = lib.mkForce unset;
 
             # Explicitly disable unsupported architectures
             ARCH_ACTIONS = lib.mkForce no;
@@ -244,6 +294,18 @@ let
             ARCH_VISCONTI = lib.mkForce no;
             ARCH_XGENE = lib.mkForce no;
             ARCH_ZYNQMP = lib.mkForce no;
+
+            # IOMMU modules
+            IOMMU_IOVA = yes;
+            IOMMU_API = yes;
+            IOMMU_SUPPORT = yes;
+            IOMMU_IO_PGTABLE = yes;
+            IOMMU_IO_PGTABLE_LPAE = yes;
+            IOMMU_IO_PGTABLE_ARMV7S = yes;
+            IOMMU_IO_PGTABLE_DART = yes;
+            IOMMU_DEFAULT_DMA_STRICT = yes;
+            OF_IOMMU = yes;
+            IOMMU_DMA = yes;
 
             # Explicit custom overrides
             NVME_AUTH = lib.mkForce yes;
