@@ -9,16 +9,16 @@ let
     (buildLinux rec {
       inherit stdenv lib;
 
-      version = "6.13.7-4-asahi";
-      modDirVersion = "6.13.7-asahi";
+      version = "6.13.8-1-asahi";
+      modDirVersion = "6.13.8-asahi";
       extraMeta.branch = "6.13";
 
       src = fetchFromGitHub {
         # tracking: https://github.com/AsahiLinux/linux/tree/asahi-wip (w/ fedora verification)
         owner = "AsahiLinux";
         repo = "linux";
-        rev = "asahi-6.13.7-4";
-        hash = "sha256-JJ0ZIZ5RfAIeKVCiOQvdgkZheto8+ODRrQXPy4/siCc=";
+        rev = "asahi-6.13.8-1";
+        hash = "sha256-A9xcszHluBm3ehEv/yOhWzbM8bXRa7SHVrIwLp7ISi8=";
       };
 
       ignoreConfigErrors = true;
