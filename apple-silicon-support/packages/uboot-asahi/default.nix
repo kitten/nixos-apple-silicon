@@ -43,6 +43,10 @@
     CONFIG_VIDEO_FONT_8X16=n
     CONFIG_VIDEO_FONT_SUN12X22=n
     CONFIG_CMD_BOOTMENU=y
+
+    CONFIG_SILENT_CONSOLE=y
+    CONFIG_SILENT_U_BOOT_ONLY=y
+    CONFIG_EXTRA_ENV_SETTINGS="silent=1\0"
   '';
 }).overrideAttrs (o: {
   # nixos's downstream patches are not applicable
