@@ -10,13 +10,13 @@
 stdenv.mkDerivation rec {
   pname = "asahi-audio";
   # tracking: https://src.fedoraproject.org/rpms/asahi-audio
-  version = "3.3";
+  version = "3.4";
 
   src = fetchFromGitHub {
     owner = "AsahiLinux";
     repo = "asahi-audio";
     rev = "v${version}";
-    hash = "sha256-p0M1pPxov+wSLT2F4G6y5NZpCXzbjZkzle+75zQ4xxU=";
+    hash = "sha256-7AuPkR/M1a4zB9+dJuOuv9uTp+kIqPlxVOXipsyGGz8=";
   };
 
   preBuild = ''
