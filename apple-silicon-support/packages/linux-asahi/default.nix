@@ -9,25 +9,21 @@ let
     (buildLinux rec {
       inherit stdenv lib;
 
-      version = "6.14.7-1-asahi";
-      modDirVersion = "6.14.7-asahi";
+      version = "6.14.8-1-asahi";
+      modDirVersion = "6.14.8-asahi";
       extraMeta.branch = "6.14";
 
       src = fetchFromGitHub {
         # tracking: https://github.com/AsahiLinux/linux/tree/asahi-wip (w/ fedora verification)
         owner = "AsahiLinux";
         repo = "linux";
-        rev = "asahi-6.14.7-1";
-        hash = "sha256-lLduMN5ZAjuOlKjHRYfJaO6LYlmBkxottYaEZyiIxnc=";
+        rev = "asahi-6.14.8-1";
+        hash = "sha256-JrWVw1FiF9LYMiOPm0QI0bg/CrZAMSSVcs4AWNDIH3Q=";
       };
 
       ignoreConfigErrors = true;
 
       kernelPatches = [
-        {
-          name = "coreutils-fix";
-          patch = ./0001-fs-fcntl-accept-more-values-as-F_DUPFD_CLOEXEC-args.patch;
-        }
         {
           name = "Asahi config";
           patch = null;
