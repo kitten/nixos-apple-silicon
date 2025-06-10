@@ -6,5 +6,4 @@ final: prev: {
   mesa-asahi-edge = final.callPackage ./mesa-asahi-edge { };
   alsa-ucm-conf-asahi = final.callPackage ./alsa-ucm-conf-asahi { inherit (prev) alsa-ucm-conf; };
   asahi-audio = final.callPackage ./asahi-audio { };
-  triforce-lv2 = final.callPackage ./triforce-lv2 { };
 }
